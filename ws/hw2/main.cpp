@@ -5,20 +5,20 @@
 #include "hw/HW2.h"
 
 // Include any custom headers you created in your workspace
-#include "MyBugAlgorithm.h"
+#include "Bug1Algorithm.h"
 
 using namespace amp;
 
 int main(int argc, char** argv) {
     /*    Include this line to have different randomized environments every time you run your code (NOTE: this has no affect on grade()) */
-    amp::RNG::seed(amp::RNG::randiUnbounded());
+    // amp::RNG::seed(amp::RNG::randiUnbounded());
 
     /*    Randomly generate the problem     */ 
 
-    // Use WO1 from Exercise 2
+    // Use W1 from Exercise 2
     Problem2D problem = HW2::getWorkspace1();
 
-    // Use WO1 from Exercise 2
+    // Use W2 from Exercise 2
     /*
     Problem2D problem = HW2::getWorkspace2();
     */
@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
     */
 
     // Declare your algorithm object 
-    MyBugAlgorithm algo;
+    Bug1Algorithm algo;
     
     {
         // Call your algorithm on the problem
