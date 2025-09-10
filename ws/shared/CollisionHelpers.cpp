@@ -1,5 +1,13 @@
 #include "CollisionHelpers.h"
 #include <cmath>
+#include <boost/geometry.hpp>
+#include <boost/geometry/geometries/register/point.hpp>
+
+// Adapt Eigen::Vector2d to Boost.Geometry
+BOOST_GEOMETRY_REGISTER_POINT_2D(Eigen::Vector2d, double,
+    boost::geometry::cs::cartesian, x(), y())
+
+namespace bg = boost::geometry;
 
 namespace amp {
 
@@ -30,6 +38,39 @@ namespace amp {
         // Find the vector from closest point to robot, then move epsilon away
         Eigen::Vector2d dir = (robotPos - closestPoint).normalized();
         return closestPoint + (dir * epsilon); // point that is "epsilon away"
+    }
+
+    // ----- Helper: Return if any two segments, including endpoints, intersect -----
+    bool doSegmentsIntersect(const std::vector<Eigen::Vector2d>& vertsA, const std::vector<Eigen::Vector2d>& vertsB) {
+
+        // Lambda for comparing two points
+        auto pointsAreEqual = [](const Eigen::Vector2d& p1, const Eigen::Vector2d& p2) {
+            return (p1 - p2).norm() < 1e-9;
+        };
+
+        // Compare all the segments formed by the vertices of A with those formed by the vertices of B
+        for (size_t i = 0; i < vertsA.size(); ++i) {
+            Eigen::Vector2d a1 = vertsA[i];
+            Eigen::Vector2d a2 = vertsA[(i+1) % vertsA.size()];
+            bg::model::segment<Eigen::Vector2d> segA(a1, a2);
+
+            for (size_t j = 0; j < vertsB.size(); ++j) {
+                Eigen::Vector2d b1 = vertsB[j];
+                Eigen::Vector2d b2 = vertsB[(j+1) % vertsB.size()];
+                bg::model::segment<Eigen::Vector2d> segB(b1, b2);
+
+                if (pointsAreEqual(a1, b1) || pointsAreEqual(a1, b2) ||
+                    pointsAreEqual(a2, b1) || pointsAreEqual(a2, b2)) {
+                    return true;
+                    }
+
+                if (bg::intersects(segA, segB)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     // ------------------- Simple ray-casting point-in-polygon -------------------
@@ -109,5 +150,60 @@ namespace amp {
 
         // Once we know the closest segment, compute hit point epsilon away
         return hitPointFromSegment(robotPos, closestA, closestB, epsilon);
+    }
+
+    // ------------------- Determine if two polygons intersect ----------------------
+    bool doPolygonsIntersect(const Obstacle2D& A, const Obstacle2D& B) {
+        const auto& vertsA = A.verticesCCW();
+        const auto& vertsB = B.verticesCCW();
+
+        // 1. Check if any vertex of A is inside B
+        for (const auto& v : vertsA) {
+            if (isPointInsidePolygon(v, B)) {
+                return true;
+            }
+        }
+
+        // 2. Check if any vertex of B is inside A
+        for (const auto& v : vertsB) {
+            if (isPointInsidePolygon(v, A)) {
+                return true;
+            }
+        }
+
+        // 3. Use doesSegmentIntersect for edge intersections
+        if (doSegmentsIntersect(vertsA, vertsB)) {
+            return true;
+        }
+
+        // No intersections found
+        return false;
+    }
+
+    // ------------------- Build Adjacency List of All Obstacles ----------------------
+    std::vector<std::vector<size_t>> buildAdjacencyList(std::vector<amp::Obstacle2D> obstacles) {
+        size_t n = obstacles.size();
+        std::vector<std::vector<size_t>> adj(n);
+
+        for (size_t i = 0; i < n; ++i) {
+            for (size_t j = i + 1; j < n; ++j) {
+                if (doPolygonsIntersect(obstacles[i], obstacles[j])) {
+                    adj[i].push_back(j);
+                    adj[j].push_back(i); // undirected graph
+                }
+            }
+        }
+        return adj;
+
+    }
+
+    // -------------- DF Search to determine the "island" the robot is allowed to navigate around -----------------
+    void dfs(const std::vector<std::vector<size_t>>& adj, size_t current, std::unordered_set<size_t>& cluster) {
+        cluster.insert(current);
+        for (size_t neighbor : adj[current]) {
+            if (cluster.count(neighbor) == 0) {
+                dfs(adj, neighbor, cluster);
+            }
+        }
     }
 }

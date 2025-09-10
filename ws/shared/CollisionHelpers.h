@@ -2,6 +2,8 @@
 #include <vector>
 #include <Eigen/Core>
 #include <cstddef>  // for size_t
+#include <unordered_set>
+
 #include "AMPCore.h"  // for Polygon / Obstacle2D
 
 namespace amp {
@@ -20,5 +22,13 @@ namespace amp {
     Eigen::Vector2d findHitPoint(const Eigen::Vector2d& robotPos,
                                  const Obstacle2D& obs,
                                  double epsilon);
+
+
+    // DFS to mutate cluster (
+    void dfs(const std::vector<std::vector<size_t>>& adj,
+             size_t current,
+             std::unordered_set<size_t>& cluster);
+
+    std::vector<std::vector<size_t>> buildAdjacencyList(std::vector<amp::Obstacle2D> obstacles);
 
 }
