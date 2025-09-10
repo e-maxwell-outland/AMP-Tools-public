@@ -19,7 +19,7 @@ amp::Path2D Bug1Algorithm::plan(const amp::Problem2D& problem) {
 
     path.waypoints.push_back(current);
 
-    std::cout << "Starting navigation...\n";
+    //std::cout << "Starting navigation...\n";
 
     while ((current - end).norm() > Bug1Algorithm::STEP_SIZE * 0.5) {
 

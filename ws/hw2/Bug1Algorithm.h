@@ -13,7 +13,7 @@ class Bug1Algorithm : public amp::BugAlgorithm {
     private:
         static constexpr double EPSILON = 0.005;   // collision buffer
         static constexpr double STEP_SIZE = 0.005; // step size towards goal
-        static constexpr double DELTA_THETA = 0.05; // amount for robot to turn while perimeter following (in rad)
+        static constexpr double DELTA_THETA = 0.02; // amount for robot to turn while perimeter following (in rad)
         size_t hitObstacleIdx = SIZE_MAX; // "no obstacle yet"
         bool leftTurning;
 };
