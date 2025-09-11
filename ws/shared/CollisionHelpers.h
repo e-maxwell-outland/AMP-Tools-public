@@ -23,12 +23,17 @@ namespace amp {
                                  const Obstacle2D& obs,
                                  double epsilon);
 
+    // Builds an adjacency graph for the problem (which obstacles are connected to which obstacles)
+    std::vector<std::vector<size_t>> buildAdjacencyList(std::vector<amp::Obstacle2D> obstacles);
 
-    // DFS to mutate cluster (
+    // DFS to mutate cluster
     void dfs(const std::vector<std::vector<size_t>>& adj,
              size_t current,
              std::unordered_set<size_t>& cluster);
 
-    std::vector<std::vector<size_t>> buildAdjacencyList(std::vector<amp::Obstacle2D> obstacles);
-
+    // For a given point, start, and goal (with some buffer epsilon), find if point is on the line from start to goal
+    bool isOnMLine(const Eigen::Vector2d& point,
+               const Eigen::Vector2d& start,
+               const Eigen::Vector2d& goal,
+               double epsilon);
 }

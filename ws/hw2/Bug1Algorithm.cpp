@@ -23,7 +23,7 @@ amp::Path2D Bug1Algorithm::plan(const amp::Problem2D& problem) {
 
     while ((current - end).norm() > Bug1Algorithm::STEP_SIZE * 0.5) {
 
-        // Try to go forward
+        // ------------------- Forward moving -------------------
         auto next = amp::moveToGoal(current, end, Bug1Algorithm::STEP_SIZE);
 
         // Check if your next "step" forward will cause a collision. If so, find hit point on obstacle and enter

@@ -206,4 +206,34 @@ namespace amp {
             }
         }
     }
+
+    // -------------- From the current point,  -----------------
+    bool isOnMLine(const Eigen::Vector2d& point, const Eigen::Vector2d& start, const Eigen::Vector2d& goal,
+                   double epsilon) {
+
+        // Vector from start to goal
+        Eigen::Vector2d sg = goal - start;
+
+        // Vector from start to current point
+        Eigen::Vector2d sp = point - start;
+
+        // 1. Cross product (should be ~0 if on line)
+        double cross = sg.x() * sp.y() - sg.y() * sp.x();
+
+        // If |cross| is bigger than epsilon, the point is not on the line
+        if (std::abs(cross) > epsilon) {
+            return false;
+        }
+
+        // 2. Bounding box check (so point is between start and goal)
+        double minX = std::min(start.x(), goal.x()) - epsilon;
+        double maxX = std::max(start.x(), goal.x()) + epsilon;
+        double minY = std::min(start.y(), goal.y()) - epsilon;
+        double maxY = std::max(start.y(), goal.y()) + epsilon;
+
+        if (point.x() < minX || point.x() > maxX) return false;
+        if (point.y() < minY || point.y() > maxY) return false;
+
+        return true;
+    }
 }

@@ -6,6 +6,7 @@
 
 // Include any custom headers you created in your workspace
 #include "Bug1Algorithm.h"
+#include "Bug2Algorithm.h"
 
 using namespace amp;
 
@@ -16,7 +17,7 @@ int main(int argc, char** argv) {
     /*    Randomly generate the problem     */ 
 
     // Use W1 from Exercise 2
-    // Problem2D problem = HW2::getWorkspace1();
+    Problem2D problem = HW2::getWorkspace1();
 
     // Use W2 from Exercise 2
     // Problem2D problem = HW2::getWorkspace2();
@@ -35,20 +36,20 @@ int main(int argc, char** argv) {
 
     // Declare your algorithm object
     bool leftTurning = true;
-    Bug1Algorithm algo(leftTurning);
+    Bug2Algorithm algo(leftTurning);
     
-    // {
-    //     // Call your algorithm on the problem
-    //     amp::Path2D path = algo.plan(problem);
-    //
-    //     // Check your path to make sure that it does not collide with the environment
-    //     bool success = HW2::check(path, problem);
-    //
-    //     LOG("Found valid solution to workspace 1: " << (success ? "Yes!" : "No :("));
-    //
-    //     // Visualize the path and environment
-    //     Visualizer::makeFigure(problem, path);
-    // }
+    {
+        // Call your algorithm on the problem
+        amp::Path2D path = algo.plan(problem);
+
+        // Check your path to make sure that it does not collide with the environment
+        bool success = HW2::check(path, problem);
+
+        LOG("Found valid solution to workspace 1: " << (success ? "Yes!" : "No :("));
+
+        // Visualize the path and environment
+        Visualizer::makeFigure(problem, path);
+    }
 
     // Let's get crazy and generate a random environment and test your algorithm
     // {
@@ -66,23 +67,26 @@ int main(int argc, char** argv) {
 
     Visualizer::saveFigures(true, "hw2_figs");
 
-    // int i = 0;
-    // while (i < 20) {
-    //     amp::Path2D path; // Make empty path, problem, and collision points, as they will be created by generateAndCheck()
-    //     amp::Problem2D random_prob;
-    //     std::vector<Eigen::Vector2d> collision_points;
-    //     HW2::generateAndCheck(algo, path, random_prob, collision_points);
-    //
-    //     std::cerr << "collision_points.size(): " << collision_points.size() << "\n";
-    //     std::cerr << "dist to goal: " << (path.waypoints.back() - random_prob.q_goal).norm() << "\n";
-    //
-    //     if ((!collision_points.empty()) || (path.waypoints.back() - random_prob.q_goal).norm() > 0.5) {
-    //         Visualizer::makeFigure(random_prob, path, collision_points);
-    //         Visualizer::saveFigures(true, "hw2_figs");
-    //     }
-    //
-    //     i++;
-    // }
+    int i = 0;
+    int fails = 0;
+    int numTests = 100;
+
+    while (i < numTests) {
+        amp::Path2D path; // Make empty path, problem, and collision points, as they will be created by generateAndCheck()
+        amp::Problem2D random_prob;
+        std::vector<Eigen::Vector2d> collision_points;
+        HW2::generateAndCheck(algo, path, random_prob, collision_points);
+
+        if ((!collision_points.empty()) || (path.waypoints.back() - random_prob.q_goal).norm() > 0.5) {
+            fails += 1;
+            Visualizer::makeFigure(random_prob, path, collision_points);
+            Visualizer::saveFigures(true, "hw2_figs");
+        }
+
+        i++;
+    }
+
+    std::cout << "Fails = " << fails << "/" << numTests << "\n";
 
     HW2::grade(algo, "emily.maxwell@colorado.edu", argc, argv);
     
