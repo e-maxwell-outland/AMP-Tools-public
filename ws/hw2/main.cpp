@@ -11,90 +11,77 @@
 using namespace amp;
 
 int main(int argc, char** argv) {
-    /*    Include this line to have different randomized environments every time you run your code (NOTE: this has no affect on grade()) */
-    amp::RNG::seed(amp::RNG::randiUnbounded());
-
-    /*    Randomly generate the problem     */ 
-
-    // Use W1 from Exercise 2
-    Problem2D problem = HW2::getWorkspace1();
-
-    // Use W2 from Exercise 2
-    // Problem2D problem = HW2::getWorkspace2();
-
-    // Make a random environment spec, edit properties about it such as the number of obstacles
-    /*
-    Random2DEnvironmentSpecification spec;
-    spec.max_obstacle_region_radius = 5.0;
-    spec.n_obstacles = 2;
-    spec.path_clearance = 0.01;
-    spec.d_sep = 0.01;
-
-    //Randomly generate the environment;
-    Problem2D problem = EnvironmentTools::generateRandom(spec); // Random environment
-    */
 
     // Declare your algorithm object
     bool leftTurning = true;
     Bug2Algorithm algo(leftTurning);
-    
+
+    /* Different randomized environments every time you run your code */
+    amp::RNG::seed(amp::RNG::randiUnbounded());
+
+    /* Generate the problem */
+
+    // Use W1 from Exercise 2
+    Problem2D problem2a = HW2::getWorkspace1();
+
+    // Use W2 from Exercise 2
+    Problem2D problem2b = HW2::getWorkspace2();
+
+    /* Run problem 2a */
     {
         // Call your algorithm on the problem
-        amp::Path2D path = algo.plan(problem);
+        amp::Path2D path = algo.plan(problem2a);
 
         // Check your path to make sure that it does not collide with the environment
-        bool success = HW2::check(path, problem);
+        bool success = HW2::check(path, problem2a);
 
-        LOG("Found valid solution to workspace 1: " << (success ? "Yes!" : "No :("));
+        LOG("Found valid solution to WS 1: " << (success ? "Yes!" : "No :("));
+        LOG("WS 1 path length: " << path.length());
 
         // Visualize the path and environment
-        Visualizer::makeFigure(problem, path);
+        Visualizer::makeFigure(problem2a, path);
     }
 
-    // Let's get crazy and generate a random environment and test your algorithm
-    // {
-    //     amp::Path2D path; // Make empty path, problem, and collision points, as they will be created by generateAndCheck()
-    //     amp::Problem2D random_prob;
-    //     std::vector<Eigen::Vector2d> collision_points;
-    //     bool random_trial_success = HW2::generateAndCheck(algo, path, random_prob, collision_points);
-    //     LOG("Found valid solution in random environment: " << (random_trial_success ? "Yes!" : "No :("));
-    //
-    //     LOG("path length: " << path.length());
-    //
-    //     // Visualize the path environment, and any collision points with obstacles
-    //     Visualizer::makeFigure(random_prob, path, collision_points);
-    // }
+    /* Run problem 2b */
+    {
+        // Call your algorithm on the problem
+        amp::Path2D path = algo.plan(problem2b);
+
+        // Check your path to make sure that it does not collide with the environment
+        bool success = HW2::check(path, problem2b);
+
+        LOG("Found valid solution to WS 2: " << (success ? "Yes!" : "No :("));
+        LOG("WS2 path length: " << path.length());
+
+        // Visualize the path and environment
+        Visualizer::makeFigure(problem2b, path);
+    }
 
     Visualizer::saveFigures(true, "hw2_figs");
 
-    int i = 0;
-    int fails = 0;
-    int numTests = 100;
-
-    while (i < numTests) {
-        amp::Path2D path; // Make empty path, problem, and collision points, as they will be created by generateAndCheck()
-        amp::Problem2D random_prob;
-        std::vector<Eigen::Vector2d> collision_points;
-        HW2::generateAndCheck(algo, path, random_prob, collision_points);
-
-        if ((!collision_points.empty()) || (path.waypoints.back() - random_prob.q_goal).norm() > 0.5) {
-            fails += 1;
-            Visualizer::makeFigure(random_prob, path, collision_points);
-            Visualizer::saveFigures(true, "hw2_figs");
-        }
-
-        i++;
-    }
-
-    std::cout << "Fails = " << fails << "/" << numTests << "\n";
+    /* Run numTests random tests */
+    // int i = 0;
+    // int fails = 0;
+    // int numTests = 100;
+    //
+    // while (i < numTests) {
+    //     amp::Path2D path; // Make empty path, problem, and collision points, as they will be created by generateAndCheck()
+    //     amp::Problem2D random_prob;
+    //     std::vector<Eigen::Vector2d> collision_points;
+    //     HW2::generateAndCheck(algo, path, random_prob, collision_points);
+    //
+    //     if ((!collision_points.empty()) || (path.waypoints.back() - random_prob.q_goal).norm() > 0.5) {
+    //         fails += 1;
+    //         Visualizer::makeFigure(random_prob, path, collision_points);
+    //         Visualizer::saveFigures(true, "hw2_figs");
+    //     }
+    //
+    //     i++;
+    // }
+    //
+    // std::cout << "Fails = " << fails << "/" << numTests << "\n";
 
     HW2::grade(algo, "emily.maxwell@colorado.edu", argc, argv);
-    
-    /* If you want to reconstruct your bug algorithm object every trial (to reset member variables from scratch or initialize), use this method instead*/
-    //HW2::grade<MyBugAlgorithm>("nonhuman.biologic@myspace.edu", argc, argv, constructor_parameter_1, constructor_parameter_2, etc...);
-    
-    // This will reconstruct using the default constructor every trial
-    //HW2::grade<MyBugAlgorithm>("nonhuman.biologic@myspace.edu", argc, argv);
 
     return 0;
 }
