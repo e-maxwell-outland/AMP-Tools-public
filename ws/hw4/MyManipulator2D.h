@@ -10,7 +10,9 @@
 class MyManipulator2D : public amp::LinkManipulator2D {
     public:
         // Default constructor
-        MyManipulator2D();
+        MyManipulator2D();                                  // existing default
+        MyManipulator2D(double link1, double link2);        // 2-link custom
+        MyManipulator2D(const std::vector<double> links);  // n-link custom
 
         // Override this method for implementing forward kinematics
         virtual Eigen::Vector2d getJointLocation(const amp::ManipulatorState& state, uint32_t joint_index) const override;

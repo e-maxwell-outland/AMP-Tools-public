@@ -156,7 +156,7 @@ class GridCSpace2D : public ConfigurationSpace2D, public DenseArray2D<bool> {
 
         /*****************************************/
 
-        /// @brief I have overridded this method for you. This method uses the `getCellFromPoint` to determine which cell (x0, x1) is in,
+        /// @brief I have overridden this method for you. This method uses the `getCellFromPoint` to determine which cell (x0, x1) is in,
         /// then return the boolean value inside that cell
         /// @param x0 Value of the first configuration space variable
         /// @param x1 Value of the second configuration space variable

@@ -60,26 +60,26 @@ int main(int argc, char** argv) {
     Visualizer::saveFigures(true, "hw2_figs");
 
     /* Run numTests random tests */
-    // int i = 0;
-    // int fails = 0;
-    // int numTests = 100;
-    //
-    // while (i < numTests) {
-    //     amp::Path2D path; // Make empty path, problem, and collision points, as they will be created by generateAndCheck()
-    //     amp::Problem2D random_prob;
-    //     std::vector<Eigen::Vector2d> collision_points;
-    //     HW2::generateAndCheck(algo, path, random_prob, collision_points);
-    //
-    //     if ((!collision_points.empty()) || (path.waypoints.back() - random_prob.q_goal).norm() > 0.5) {
-    //         fails += 1;
-    //         Visualizer::makeFigure(random_prob, path, collision_points);
-    //         Visualizer::saveFigures(true, "hw2_figs");
-    //     }
-    //
-    //     i++;
-    // }
-    //
-    // std::cout << "Fails = " << fails << "/" << numTests << "\n";
+    int i = 0;
+    int fails = 0;
+    int numTests = 100;
+
+    while (i < numTests) {
+        amp::Path2D path; // Make empty path, problem, and collision points, as they will be created by generateAndCheck()
+        amp::Problem2D random_prob;
+        std::vector<Eigen::Vector2d> collision_points;
+        HW2::generateAndCheck(algo, path, random_prob, collision_points);
+
+        if ((!collision_points.empty()) || (path.waypoints.back() - random_prob.q_goal).norm() > 0.5) {
+            fails += 1;
+            Visualizer::makeFigure(random_prob, path, collision_points);
+            Visualizer::saveFigures(true, "hw2_figs");
+        }
+
+        i++;
+    }
+
+    std::cout << "Fails = " << fails << "/" << numTests << "\n";
 
     HW2::grade(algo, "emily.maxwell@colorado.edu", argc, argv);
 
