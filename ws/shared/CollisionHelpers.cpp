@@ -92,7 +92,7 @@ namespace amp {
         return (crossings % 2 == 1);  // odd → inside, even → outside
     }
 
-    // ------------------- Collision check with epsilon ----------------------
+    // ------------------- Collision check for a point in a 2D WS with epsilon buffer ----------------------
     bool isInCollision(const Eigen::Vector2d& point, const std::vector<Obstacle2D>& obstacles, double epsilon,
                        size_t& hitObstacleIdx) {
         for (size_t i = 0; i < obstacles.size(); ++i) {
@@ -207,7 +207,7 @@ namespace amp {
         }
     }
 
-    // -------------- From the current point,  -----------------
+    // -------------- Determine if a point is on the direct line from start to goal -----------------
     bool isOnMLine(const Eigen::Vector2d& point, const Eigen::Vector2d& start, const Eigen::Vector2d& goal,
                    double epsilon) {
 
@@ -235,5 +235,21 @@ namespace amp {
         if (point.y() < minY || point.y() > maxY) return false;
 
         return true;
+    }
+
+    // -------------- Determine if an edge/segment intersects with an obstacle -----------------
+    bool edgeCollides(const Eigen::Vector2d& start, const Eigen::Vector2d& end,
+                      const std::vector<amp::Obstacle2D>& obstacles, double stepSize, double epsilon) {
+
+        // Dummy obstacle index for isInCollision function
+        size_t hitObstacleIdx;
+
+        // Check for all points stepSize apart along the segment for collision
+        for (double t = 0; t <= 1.0; t += stepSize) {
+            Eigen::Vector2d p = (1.0 - t) * start + t * end;
+            if (amp::isInCollision(p, obstacles, epsilon, hitObstacleIdx)) return true;
+        }
+
+        return false;
     }
 }

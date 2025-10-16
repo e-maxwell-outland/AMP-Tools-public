@@ -33,7 +33,13 @@ namespace amp {
 
     // For a given point, start, and goal (with some buffer epsilon), find if point is on the line from start to goal
     bool isOnMLine(const Eigen::Vector2d& point,
-               const Eigen::Vector2d& start,
-               const Eigen::Vector2d& goal,
-               double epsilon);
+                    const Eigen::Vector2d& start,
+                    const Eigen::Vector2d& goal,
+                    double epsilon);
+
+    bool edgeCollides(const Eigen::Vector2d& start,
+                        const Eigen::Vector2d& end,
+                        const std::vector<amp::Obstacle2D>& obstacles,
+                        double stepSize,
+                        double epsilon = 0.0);
 }
