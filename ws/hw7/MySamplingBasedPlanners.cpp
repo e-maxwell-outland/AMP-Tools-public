@@ -6,6 +6,11 @@
 #include <queue>
 #include <tuple>
 
+// PRM Constructor
+MyPRM::MyPRM(int num_samples, double neighbor_radius)
+    : N_in(num_samples), r_in(neighbor_radius), did_it_work(false) {
+}
+
 // Define struct for nodes of KD tree
 struct KDNode {
     Eigen::Vector2d point;  // The point in workspace
@@ -118,123 +123,350 @@ std::vector<amp::Node> findKNearestNeighbors(KDNode* root, const Eigen::Vector2d
     return neighbors;
 }
 
-/* -------- PRM algorithm -------- */
-amp::Path2D MyPRM::plan(const amp::Problem2D& problem) {
+///* -------- Recursive helper: radius search on KD-tree -------- */
+//void radiusSearch(KDNode* node,
+//                  const Eigen::Vector2d& query,
+//                  double radius,
+//                  int depth,
+//                  HeapType& maxHeap)
+//{
+//    if (!node) return;
+//
+//    // Compute squared distance to avoid sqrt
+//    double distSquared = (node->point - query).squaredNorm();
+//    double radiusSquared = radius * radius;
+//
+//    if (distSquared <= radiusSquared) {
+//        maxHeap.push({std::sqrt(distSquared), node->index});  // store actual distance in heap
+//    }
+//
+//    // Determine which child to search first based on splitting axis
+//    int axis = depth % query.size();
+//    double axisDiff = query(axis) - node->point(axis);
+//
+//    KDNode* nearChild = (axisDiff < 0) ? node->left : node->right;
+//    KDNode* farChild  = (axisDiff < 0) ? node->right : node->left;
+//
+//    // Always search near child
+//    radiusSearch(nearChild, query, radius, depth + 1, maxHeap);
+//
+//    // Only search far child if splitting plane intersects the radius sphere
+//    if (axisDiff * axisDiff <= radiusSquared) {
+//        radiusSearch(farChild, query, radius, depth + 1, maxHeap);
+//    }
+//}
+//
+///* -------- Helper: get all neighbors within radius -------- */
+//std::vector<amp::Node> findRadiusNeighbors(KDNode* root, const Eigen::Vector2d& query, double radius,
+//                                           int maxNeighbors = -1) {
+//
+//    // Create the heap and run the search
+//    HeapType heap;
+//    radiusSearch(root, query, radius, 0, heap);
+//
+//    std::vector<amp::Node> neighbors;
+//    neighbors.reserve(heap.size());
+//
+//    // Pop all neighbors from the heap
+//    while (!heap.empty()) {
+//        neighbors.push_back(heap.top().second);
+//        heap.pop();
+//    }
+//
+//    // Heap gives farthest first, so reverse for closest first
+//    std::reverse(neighbors.begin(), neighbors.end());
+//
+//    // If a max cap is set, trim the list
+//    if (maxNeighbors > 0 && (int)neighbors.size() > maxNeighbors) {
+//        neighbors.resize(maxNeighbors);
+//    }
+//
+//    return neighbors;
+//}
 
-    // Get dimensions of the workspace
+/* -------- Helper: Not using KDtree, finding neighbors by radius -------- */
+std::vector<amp::Node> findRadiusNeighborsNaive(const std::vector<Eigen::Vector2d>& nodes, const Eigen::Vector2d& query,
+                                                double radius) {
+    std::vector<amp::Node> neighbors;
+    double r2 = radius * radius;  // use squared distance for efficiency
+
+    for (amp::Node i = 0; i < nodes.size(); ++i) {
+        double dist2 = (nodes[i] - query).squaredNorm();
+        if (dist2 <= r2) {
+            neighbors.push_back(i);
+        }
+    }
+    return neighbors;
+}
+
+//
+void greedySmoothPath(amp::Path2D &path, const std::vector<amp::Obstacle2D>& obstacles, double step = 0.01,
+                      double epsilon = 0.1) {
+
+    if (path.waypoints.size() < 3)
+        return;
+
+    size_t i = 0;
+    while (i < path.waypoints.size() - 2) {
+        size_t j = path.waypoints.size() - 1; // try connecting directly to the end
+        while (j > i + 1) {
+            if (!edgeCollides(path.waypoints[i], path.waypoints[j], obstacles, step, epsilon)) {
+                // remove all points between i and j
+                path.waypoints.erase(path.waypoints.begin() + i + 1,
+                                     path.waypoints.begin() + j);
+                break; // go to next i
+            }
+            --j;
+        }
+        ++i;
+    }
+}
+
+/* -------- PRM algorithm (naive radius search, no KD-tree) -------- */
+amp::Path2D MyPRM::plan(const amp::Problem2D& problem) {
+    nodes_for_plot.clear();
+
     double xmin = problem.x_min;
     double xmax = problem.x_max;
     double ymin = problem.y_min;
     double ymax = problem.y_max;
 
-    // Get obstacles in WS
-    auto obstacles = problem.obstacles;
+    // Bounds for HW5, WS1
+//    double xmin = -1.0;
+//    double xmax = 11.0;
+//    double ymin = -3.0;
+//    double ymax = 3.0;
 
-    // Random number generator
+    // Bounds for HW2, WS2
+//    double xmin = -5.0;
+//    double xmax = 35.0;
+//    double ymin = -5.0;
+//    double ymax = 5.0;
+
+      auto obstacles = problem.obstacles;
+
     std::random_device rd;
-    std::mt19937 gen(rd()); // Mersenne Twister engine
-
-    // Make uniform distributions in the x and y dimensions
+    std::mt19937 gen(rd());
     std::uniform_real_distribution<double> distX(xmin, xmax);
     std::uniform_real_distribution<double> distY(ymin, ymax);
 
-    // -------- Sample the workspace and find N points in the free space --------
     std::vector<Eigen::Vector2d> samples;
-    int N = 500; // desired number of samples
-
-    // Define dummy hit index and small epsilon distance to give clearance from obstacles
+    int N = N_in;
     size_t hitObstacleIdx;
     double epsilon = 0.1;
 
     while (samples.size() < N) {
-        Eigen::Vector2d q;
-        q << distX(gen), distY(gen);
-
-        bool collides = amp::isInCollision(q, obstacles, epsilon, hitObstacleIdx);
-
-        if (!collides) {
+        Eigen::Vector2d q{distX(gen), distY(gen)};
+        if (!amp::isInCollision(q, obstacles, epsilon, hitObstacleIdx)) {
             samples.push_back(q);
         }
     }
 
-    // -------- Build a KD tree to quickly determine the nearest neighbors for each sampled point --------
-    // Build KD-tree
-    std::vector<amp::Node> indices(samples.size());
-    for (amp::Node i = 0; i < samples.size(); ++i)
-        indices[i] = i;
-
-    KDNode* kdTreeRoot = buildKDTree(samples, indices);
-
-    // Add start and goal points to the PRM graph to be connected
-    samples.push_back(problem.q_init);
-    samples.push_back(problem.q_goal);
-
-    // -------- Create the PRM graph --------
     std::shared_ptr<amp::Graph<double>> graphPtr = std::make_shared<amp::Graph<double>>();
     std::map<amp::Node, Eigen::Vector2d> nodes;
 
-    // Add sampled points as nodes
-    for (amp::Node i = 0; i < samples.size(); ++i) {
-        nodes[i] = samples[i];
-    }
+    for (amp::Node i = 0; i < samples.size(); ++i) nodes[i] = samples[i];
 
-    // -------- Connect nodes to their nearest neighbors --------
-    int k = N/2; // number of neighbors
-    double r = 2;
+    double r = r_in;
 
-    for (amp::Node i = 0; i < samples.size(); ++i) {
+    // Connect free-space samples
+    for (amp::Node i = 0; i < N; ++i) {
         Eigen::Vector2d q = samples[i];
-
-        // Query KD-tree for k nearest neighbors
-        std::vector<amp::Node> temp_neighbors = findKNearestNeighbors(kdTreeRoot, q, k);
-        std::vector<amp::Node> neighbors;
-//        std::vector<amp::Node> neighbors = temp_neighbors;
-
-        for (amp::Node j = 0; j < temp_neighbors.size(); ++j) {
-            if ((q - nodes[j]).norm() < r) {
-                neighbors.push_back(temp_neighbors[j]);
-            }
-        }
+        std::vector<amp::Node> neighbors = findRadiusNeighborsNaive(samples, q, r);
 
         for (amp::Node j : neighbors) {
-            Eigen::Vector2d neighborPoint = nodes[j];
-            if (!edgeCollides(q, neighborPoint, obstacles, 0.005)) {
+            if (j <= i) continue;
+            Eigen::Vector2d neighborPoint = samples[j];
+            if (!edgeCollides(q, neighborPoint, obstacles, 0.005, epsilon)) {
                 double weight = (q - neighborPoint).norm();
-                // Connect both ways to make the graph undirected
                 graphPtr->connect(i, j, weight);
                 graphPtr->connect(j, i, weight);
             }
         }
     }
 
-    // graphPtr->print();
+    // Add start and goal nodes
+    amp::Node startIdx = samples.size();
+    amp::Node goalIdx  = samples.size() + 1;
+    samples.push_back(problem.q_init);
+    samples.push_back(problem.q_goal);
+    nodes[startIdx] = problem.q_init;
+    nodes[goalIdx]  = problem.q_goal;
 
-    /* -------- Search PRM from shortest path from start to goal -------- */
-    // Wrap PRM graph into a shortest path problem
+    // Connect start and goal to nearby samples
+    for (auto [specialIdx, q] : std::vector<std::pair<amp::Node, Eigen::Vector2d>>{
+            {startIdx, problem.q_init}, {goalIdx, problem.q_goal}}) {
+
+        for (amp::Node j = 0; j < N; ++j) {
+            Eigen::Vector2d neighborPoint = samples[j];
+            if ((q - neighborPoint).norm() <= r &&
+                !edgeCollides(q, neighborPoint, obstacles, 0.005, epsilon)) {
+                double weight = (q - neighborPoint).norm();
+                graphPtr->connect(specialIdx, j, weight);
+                graphPtr->connect(j, specialIdx, weight);
+            }
+        }
+    }
+
+    // Shortest path search
     amp::ShortestPathProblem spp;
     spp.graph = graphPtr;
-    spp.init_node = samples.size() - 2;
-    spp.goal_node = samples.size() - 1;
+    spp.init_node = startIdx;
+    spp.goal_node = goalIdx;
 
-    // Euclidean heuristic heuristic
+    auto graph_nodes = graphPtr->nodes();
+    bool start_exists = std::find(graph_nodes.begin(), graph_nodes.end(), startIdx) != graph_nodes.end();
+    bool goal_exists = std::find(graph_nodes.begin(), graph_nodes.end(), goalIdx) != graph_nodes.end();
+
+    if (!start_exists || !goal_exists) {
+        amp::Path2D path;
+        path.waypoints.push_back(problem.q_init);
+        path.waypoints.push_back(problem.q_goal);
+        return path;
+    }
+
+    amp::Path2D path;
+
     EuclideanHeuristic heuristic(nodes, problem.q_goal);
-
-    // Run A*
     MyAStarAlgo astar;
     auto result = astar.search(spp, heuristic);
 
-    // Convert node path to waypoints
-    amp::Path2D path;
+
     for (amp::Node n : result.node_path)
         path.waypoints.push_back(nodes[n]);
+
+    // Optional path smoothing
+    // greedySmoothPath(path, obstacles, 0.005, 0.1);
+
+    nodes_for_plot = nodes;
+    graph_for_plot = graphPtr;
+
+    did_it_work = result.success;
+
+    if (!result.success) {
+        amp::Path2D fail_path;
+        fail_path.waypoints.push_back(problem.q_init);
+        fail_path.waypoints.push_back(problem.q_goal);
+        return fail_path;
+    }
 
     return path;
 }
 
-// Implement your RRT algorithm here
+// RRT algorithm
 amp::Path2D MyRRT::plan(const amp::Problem2D& problem) {
-    amp::Path2D path;
-    path.waypoints.push_back(problem.q_init);
-    path.waypoints.push_back(problem.q_goal);
-    return path;
+
+    // -------- Graph & node storage --------
+    graph_for_plot = std::make_shared<amp::Graph<double>>();
+    nodes_for_plot.clear();
+
+    Eigen::Vector2d q_start = problem.q_init;
+    Eigen::Vector2d q_goal  = problem.q_goal;
+
+    // Start node: ID 0
+    amp::Node start_id = 0;
+    nodes_for_plot[start_id] = q_start;
+
+    // -------- RRT parameters --------
+    double step_size = 0.5;
+    double goal_bias = 0.05;
+    int max_iters = 5000;
+    double epsilon = 0.25;     // distance to consider goal reached
+
+    std::mt19937 gen(std::random_device{}());
+    std::uniform_real_distribution<double> bias_dist(0.0, 1.0);
+    std::uniform_real_distribution<double> dist_x(problem.x_min, problem.x_max);
+    std::uniform_real_distribution<double> dist_y(problem.y_min, problem.y_max);
+
+    // -------- Main RRT loop --------
+    for (int iter = 0; iter < max_iters; ++iter) {
+
+        // --- Sample ---
+        Eigen::Vector2d q_rand = (bias_dist(gen) < goal_bias) ? q_goal : Eigen::Vector2d(dist_x(gen), dist_y(gen));
+
+        // --- Nearest neighbor (linear search) ---
+        amp::Node nearest_id = -1;
+        double min_dist = std::numeric_limits<double>::max();
+        for (const auto& [id, pt] : nodes_for_plot) {
+            double d = (q_rand - pt).norm();
+            if (d < min_dist) {
+                min_dist = d;
+                nearest_id = id;
+            }
+        }
+        Eigen::Vector2d q_near = nodes_for_plot[nearest_id];
+
+        // --- Steer toward q_rand along direction vector ---
+        Eigen::Vector2d dir = q_rand - q_near;
+        double dist_total = dir.norm();
+        if (dist_total < 1e-6) continue; // sample too close
+        Eigen::Vector2d dir_unit = dir / dist_total;
+
+        // Clamp to step_size
+        Eigen::Vector2d q_new = q_near + dir_unit * std::min(step_size, dist_total);
+
+        // Collision check
+        size_t hit;
+        if (amp::isInCollision(q_new, problem.obstacles, 0.0, hit) ||
+            edgeCollides(q_near, q_new, problem.obstacles, 0.005))
+        {
+            continue; // cannot move in this direction
+        }
+
+        // --- Add new node ---
+        amp::Node new_id = nodes_for_plot.size(); // sequential integer ID
+        nodes_for_plot[new_id] = q_new;
+        graph_for_plot->connect(nearest_id, new_id, (q_new - q_near).norm());
+        graph_for_plot->connect(new_id, nearest_id, (q_new - q_near).norm()); // undirected
+
+        // --- Check if goal reached ---
+        if ((q_new - q_goal).norm() <= epsilon &&
+            !edgeCollides(q_new, q_goal, problem.obstacles, 0.05))
+        {
+            amp::Node goal_id = nodes_for_plot.size();
+            nodes_for_plot[goal_id] = q_goal;
+            graph_for_plot->connect(new_id, goal_id, (q_goal - q_new).norm());
+            graph_for_plot->connect(goal_id, new_id, (q_goal - q_new).norm());
+
+            // --- Use A* to find path in the tree ---
+            amp::ShortestPathProblem spp;
+            spp.graph = graph_for_plot;
+            spp.init_node = start_id;
+            spp.goal_node = goal_id;
+
+            auto graph_nodes = graph_for_plot->nodes();
+            bool start_exists = std::find(graph_nodes.begin(), graph_nodes.end(), start_id) != graph_nodes.end();
+            bool goal_exists = std::find(graph_nodes.begin(), graph_nodes.end(), goal_id) != graph_nodes.end();
+
+            if (!start_exists || !goal_exists) {
+                amp::Path2D path;
+                path.waypoints.push_back(problem.q_init);
+                path.waypoints.push_back(problem.q_goal);
+                return path;
+            }
+
+            EuclideanHeuristic heuristic(nodes_for_plot, q_goal);
+            MyAStarAlgo astar;
+            auto result = astar.search(spp, heuristic);
+
+            // --- Convert to Path2D ---
+            amp::Path2D path;
+            for (amp::Node n : result.node_path)
+                path.waypoints.push_back(nodes_for_plot[n]);
+
+            did_it_work = result.success;
+
+            if (!result.success) {
+                amp::Path2D fail_path;
+                fail_path.waypoints.push_back(problem.q_init);
+                fail_path.waypoints.push_back(problem.q_goal);
+                return fail_path;
+            }
+
+            return path;
+        }
+    }
+
+    // Failed to reach goal
+    return {};
 }
