@@ -6,14 +6,12 @@
 // Include the correct homework headers
 #include "hw/HW8.h"
 
-// This is file is loaded from the shared/ directory
-// Overwrite with your MySamplingBasedPlanners.h and MySamplingBasedPlanners.cpp from hw7
-#include "MySamplingBasedPlanners.h" 
-
-
 class MyCentralPlanner : public amp::CentralizedMultiAgentRRT {
     public:
-        virtual amp::MultiAgentPath2D plan(const amp::MultiAgentProblem2D& problem) override; 
+        virtual amp::MultiAgentPath2D plan(const amp::MultiAgentProblem2D& problem) override;
+        std::shared_ptr<amp::Graph<double>> graph_for_plot;
+        std::map<amp::Node, Eigen::VectorXd> nodes_for_plot;
+        bool did_it_work;
 };
 
 

@@ -35,15 +35,14 @@ class MyRRT : public amp::GoalBiasRRT2D {
 };
 
 class MyRRTWithAgentPaths {
-    public:
-        std::shared_ptr<amp::Graph<double>> graph_for_plot;
-        std::map<amp::Node, Eigen::Vector2d> nodes_for_plot;
-        std::vector<amp::Path2D> other_agent_paths;
-        double agent_radius;
+public:
+    std::shared_ptr<amp::Graph<double>> graph_for_plot;
+    std::map<amp::Node, Eigen::Vector2d> nodes_for_plot;  // copies, never references
+    std::vector<amp::Path2D> other_agent_paths;
+    double agent_radius;
 
-        MyRRTWithAgentPaths(const std::vector<amp::Path2D>& other_agent_paths, double agent_radius = 0.2);
+    MyRRTWithAgentPaths(const std::vector<amp::Path2D>& other_agent_paths_, double agent_radius_ = 0.2)
+        : other_agent_paths(other_agent_paths_), agent_radius(agent_radius_) {}
 
-        MyRRTWithAgentPaths(std::vector<amp::Path2D> &other_agent_paths, double agent_radius);
-
-        amp::Path2D plan(const amp::Problem2D& problem);
+    amp::Path2D plan(const amp::Problem2D& problem);
 };

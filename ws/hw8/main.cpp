@@ -5,24 +5,24 @@
 
 using namespace amp;
 
-void timer_example() {
-    double startTime;
-    amp::Timer timer("timer");
-    for (int i=0; i < 5; ++i) {
-        startTime = timer.now(TimeUnit::ms);  
-        std::cout << "Press any key to continue...\n";
-        std::cin.get();
-        std::cout << "Time since last run: " << timer.now(TimeUnit::ms) - startTime << std::endl;
-    }
-    timer.stop();
-    std::cout << "Total time since last run: " << Profiler::getTotalProfile("timer") << std::endl;
-}
+//void timer_example() {
+//    double startTime;
+//    amp::Timer timer("timer");
+//    for (int i=0; i < 5; ++i) {
+//        startTime = timer.now(TimeUnit::ms);
+//        std::cout << "Press any key to continue...\n";
+//        std::cin.get();
+//        std::cout << "Time since last run: " << timer.now(TimeUnit::ms) - startTime << std::endl;
+//    }
+//    timer.stop();
+//    std::cout << "Total time since last run: " << Profiler::getTotalProfile("timer") << std::endl;
+//}
 
 int main(int argc, char** argv) {
     // Initializing workspace 1 with 3 agents
     amp::RNG::seed(amp::RNG::randiUnbounded());
     MultiAgentPath2D path;
-    MultiAgentProblem2D problem = HW8::getWorkspace1(3);
+    MultiAgentProblem2D problem = HW8::getWorkspace1(2);
     std::vector<std::vector<Eigen::Vector2d>> collision_states;
 
     // Solve using a centralized approach
@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
     Visualizer::makeFigure(problem, path, collision_states);
 
     // Visualize and grade methods
-    Visualizer::showFigures();
-    HW8::grade<MyCentralPlanner, MyDecentralPlanner>("firstName.lastName@colorado.edu", argc, argv, std::make_tuple(), std::make_tuple());
+    Visualizer::saveFigures();
+    //HW8::grade<MyCentralPlanner, MyDecentralPlanner>("emily.maxwell@colorado.edu", argc, argv, std::make_tuple(), std::make_tuple());
     return 0;
 }

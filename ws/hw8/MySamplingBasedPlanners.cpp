@@ -11,10 +11,6 @@ MyPRM::MyPRM(int num_samples, double neighbor_radius)
     : N_in(num_samples), r_in(neighbor_radius), did_it_work(false) {
 }
 
-// De-coupled Multi-Agent RRT Constructor
-MyRRTWithAgentPaths::MyRRTWithAgentPaths(std::vector<amp::Path2D>& other_agent_paths, double agent_radius)
-    : other_agent_paths(other_agent_paths), agent_radius(agent_radius) {}
-
 //// Define struct for nodes of KD tree
 //struct KDNode {
 //    Eigen::Vector2d point;  // The point in workspace
@@ -28,7 +24,7 @@ MyRRTWithAgentPaths::MyRRTWithAgentPaths(std::vector<amp::Path2D>& other_agent_p
 
 // Struct for the A* heuristic
 struct EuclideanHeuristic : public amp::SearchHeuristic {
-    const std::map<amp::Node, Eigen::Vector2d>& nodes;
+    const std::map<amp::Node, Eigen::Vector2d> nodes;
     Eigen::Vector2d goal;
 
     EuclideanHeuristic(const std::map<amp::Node, Eigen::Vector2d>& n, const Eigen::Vector2d& g)
@@ -166,21 +162,22 @@ void greedySmoothPath(amp::Path2D &path, const std::vector<amp::Obstacle2D>& obs
     }
 }
 
-// -------------------- Helper: collision with other agents --------------------
 bool isCollisionWithOtherAgents(
     const Eigen::Vector2d& q,
     std::size_t timestep,
     const std::vector<amp::Path2D>& other_paths,
     double agent_radius)
 {
-    for (const auto& path : other_paths) {
-        // If the path is shorter than timestep, use last waypoint
-        Eigen::Vector2d other_pos;
-        if (timestep < path.waypoints.size()) {
-            other_pos = path.waypoints[timestep];
-        } else {
-            other_pos = path.waypoints.back();
+    for (std::size_t i = 0; i < other_paths.size(); ++i) {
+        const auto& path = other_paths[i];
+        if (path.waypoints.empty()) {
+            std::cout << "[DEBUG] Other agent path " << i << " is empty, skipping.\n";
+            continue;
         }
+
+        // CAP timestep to last index
+        std::size_t t = std::min(timestep, path.waypoints.size() - 1);
+        const Eigen::Vector2d& other_pos = path.waypoints[t];
 
         if ((q - other_pos).norm() < 2.0 * agent_radius) {
             return true;
@@ -188,6 +185,8 @@ bool isCollisionWithOtherAgents(
     }
     return false;
 }
+
+
 
 /* -------- PRM algorithm (naive radius search, no KD-tree) -------- */
 amp::Path2D MyPRM::plan(const amp::Problem2D& problem) {
@@ -438,17 +437,37 @@ amp::Path2D MyRRT::plan(const amp::Problem2D& problem) {
     return {};
 }
 
-// -------------------- RRT class for decoupled multi-agent planning --------------------
+// Struct for the A* heuristic using vector storage
+struct VectorEuclideanHeuristic : public amp::SearchHeuristic {
+    const std::vector<Eigen::Vector2d>& nodes; // reference to vector of nodes
+    Eigen::Vector2d goal;
+
+    VectorEuclideanHeuristic(const std::vector<Eigen::Vector2d>& n, const Eigen::Vector2d& g)
+        : nodes(n), goal(g) {}
+
+    double operator()(amp::Node node) const override {
+        if (node < 0 || node >= nodes.size()) {
+            throw std::out_of_range("VectorEuclideanHeuristic: node index out of range");
+        }
+        return (nodes[node] - goal).norm();
+    }
+};
+
 amp::Path2D MyRRTWithAgentPaths::plan(const amp::Problem2D& problem) {
+    std::cout << "[DEBUG] Entered MyRRTWithAgentPaths::plan(), "
+              << "other_paths.size()=" << other_agent_paths.size()
+              << ", agent_radius=" << agent_radius << "\n";
+
     graph_for_plot = std::make_shared<amp::Graph<double>>();
-    nodes_for_plot.clear();
+    std::vector<Eigen::Vector2d> nodes_for_plot;
+    std::vector<std::size_t> node_depths;
 
     Eigen::Vector2d q_start = problem.q_init;
     Eigen::Vector2d q_goal  = problem.q_goal;
-    amp::Node start_id = 0;
-    nodes_for_plot[start_id] = q_start;
 
-    // RRT parameters
+    nodes_for_plot.push_back(q_start); // node 0
+    node_depths.push_back(0);
+
     double step_size = 0.5;
     double goal_bias = 0.05;
     int max_iters = 5000;
@@ -459,25 +478,23 @@ amp::Path2D MyRRTWithAgentPaths::plan(const amp::Problem2D& problem) {
     std::uniform_real_distribution<double> dist_x(problem.x_min, problem.x_max);
     std::uniform_real_distribution<double> dist_y(problem.y_min, problem.y_max);
 
-    // Track depth/timestep for each node
-    std::map<amp::Node, std::size_t> node_depths;
-    node_depths[start_id] = 0;
-
     for (int iter = 0; iter < max_iters; ++iter) {
-        // --- Sample ---
-        Eigen::Vector2d q_rand = (bias_dist(gen) < goal_bias) ? q_goal
+        Eigen::Vector2d q_rand = (bias_dist(gen) < goal_bias)
+                                     ? q_goal
                                      : Eigen::Vector2d(dist_x(gen), dist_y(gen));
 
         // --- Nearest neighbor ---
-        amp::Node nearest_id = -1;
         double min_dist = std::numeric_limits<double>::max();
-        for (const auto& [id, pt] : nodes_for_plot) {
-            double d = (q_rand - pt).norm();
+        int nearest_id = -1;
+        for (int i = 0; i < nodes_for_plot.size(); ++i) {
+            double d = (q_rand - nodes_for_plot[i]).norm();
             if (d < min_dist) {
                 min_dist = d;
-                nearest_id = id;
+                nearest_id = i;
             }
         }
+        if (nearest_id == -1) continue;
+
         Eigen::Vector2d q_near = nodes_for_plot[nearest_id];
         std::size_t near_depth = node_depths[nearest_id];
 
@@ -485,60 +502,48 @@ amp::Path2D MyRRTWithAgentPaths::plan(const amp::Problem2D& problem) {
         Eigen::Vector2d dir = q_rand - q_near;
         double dist_total = dir.norm();
         if (dist_total < 1e-6) continue;
-        Eigen::Vector2d dir_unit = dir / dist_total;
-        double step = std::min(step_size, dist_total); // explicitly a double
-        Eigen::Vector2d q_new = q_near + dir_unit * step;
+        Eigen::Vector2d q_new = q_near + dir / dist_total * std::min(step_size, dist_total);
+        std::size_t new_depth = near_depth + 1;
 
         // --- Collision check ---
         size_t hit;
-        std::size_t new_depth = near_depth + 1; // 1 step per edge
-        if (amp::isInCollision(q_new, problem.obstacles, 0.0, hit) ||
-            edgeCollides(q_near, q_new, problem.obstacles, 0.005) ||
-            isCollisionWithOtherAgents(q_new, new_depth, other_agent_paths, agent_radius)) {
-            continue;
-        }
+        if (amp::isInCollision(q_new, problem.obstacles, agent_radius, hit)) continue;
+        if (edgeCollides(q_near, q_new, problem.obstacles, 0.005, agent_radius)) continue;
+        if (!other_agent_paths.empty() &&
+            isCollisionWithOtherAgents(q_new, new_depth, other_agent_paths, agent_radius)) continue;
 
         // --- Add node ---
-        amp::Node new_id = nodes_for_plot.size();
-        nodes_for_plot[new_id] = q_new;
-        node_depths[new_id] = new_depth;
+        int new_id = nodes_for_plot.size();
+        nodes_for_plot.push_back(q_new);
+        node_depths.push_back(new_depth);
         graph_for_plot->connect(nearest_id, new_id, (q_new - q_near).norm());
         graph_for_plot->connect(new_id, nearest_id, (q_new - q_near).norm());
 
-        // --- Check goal ---
+        // --- Goal check ---
         if ((q_new - q_goal).norm() <= epsilon &&
-            !edgeCollides(q_new, q_goal, problem.obstacles, 0.05)) {
-            amp::Node goal_id = nodes_for_plot.size();
-            nodes_for_plot[goal_id] = q_goal;
-            node_depths[goal_id] = new_depth + 1;
+            !edgeCollides(q_new, q_goal, problem.obstacles, 0.05))
+        {
+            int goal_id = nodes_for_plot.size();
+            nodes_for_plot.push_back(q_goal);
+            node_depths.push_back(new_depth + 1);
             graph_for_plot->connect(new_id, goal_id, (q_goal - q_new).norm());
             graph_for_plot->connect(goal_id, new_id, (q_goal - q_new).norm());
 
-            // --- Use A* to find path in the tree ---
+            // --- A* search ---
             amp::ShortestPathProblem spp;
             spp.graph = graph_for_plot;
-            spp.init_node = start_id;
+            spp.init_node = 0;
             spp.goal_node = goal_id;
 
-            auto graph_nodes = graph_for_plot->nodes();
-            bool start_exists = std::find(graph_nodes.begin(), graph_nodes.end(), start_id) != graph_nodes.end();
-            bool goal_exists = std::find(graph_nodes.begin(), graph_nodes.end(), goal_id) != graph_nodes.end();
-
-            if (!start_exists || !goal_exists) {
-                amp::Path2D path;
-                path.waypoints.push_back(problem.q_init);
-                path.waypoints.push_back(problem.q_goal);
-                return path;
-            }
-
-            EuclideanHeuristic heuristic(nodes_for_plot, q_goal);
+            VectorEuclideanHeuristic heuristic(nodes_for_plot, q_goal);
             MyAStarAlgo astar;
             auto result = astar.search(spp, heuristic);
 
-            // --- Convert to Path2D ---
+            // --- Build Path2D ---
             amp::Path2D path;
-            for (amp::Node n : result.node_path)
-                path.waypoints.push_back(nodes_for_plot[n]);
+            for (int n : result.node_path) {
+                if (n >= 0 && n < nodes_for_plot.size()) path.waypoints.push_back(nodes_for_plot[n]);
+            }
 
             if (!result.success) {
                 amp::Path2D fail_path;
@@ -548,9 +553,8 @@ amp::Path2D MyRRTWithAgentPaths::plan(const amp::Problem2D& problem) {
             }
 
             return path;
-            }
+        }
     }
 
-    // Failed to reach goal
-    return {};
+    return {}; // failed
 }

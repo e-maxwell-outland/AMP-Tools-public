@@ -12,10 +12,10 @@ using namespace amp;
 int main(int argc, char** argv) {
 
     /* Problem 1 */
-//    MyPRM prm5(200, 1.0);
-//    Problem2D problem52a = HW5::getWorkspace1();
-//    Problem2D problem21 = HW2::getWorkspace1();
-//    Problem2D problem22 = HW2::getWorkspace2();
+    MyPRM prm5(200, 1.0);
+    Problem2D problem52a = HW5::getWorkspace1();
+    Problem2D problem21 = HW2::getWorkspace1();
+    Problem2D problem22 = HW2::getWorkspace2();
 
     // PRM on HW5, 2a
 //    Visualizer::makeFigure(problem52a, prm5.plan(problem52a), *prm5.graph_for_plot, prm5.nodes_for_plot);
@@ -27,17 +27,17 @@ int main(int argc, char** argv) {
 //    MyPRM prm22(300, 2.5);
 //    Visualizer::makeFigure(problem22, prm22.plan(problem22), *prm22.graph_for_plot, prm22.nodes_for_plot);
 
-//    /* Problem 2 */
-//    MyRRT rrt;
-//
-//    // PRM on HW5, 2a
-//    Visualizer::makeFigure(problem52a, rrt.plan(problem52a), *rrt.graph_for_plot, rrt.nodes_for_plot);
-//
-//    // PRM on HW2, 2
-//    Visualizer::makeFigure(problem21, rrt.plan(problem21), *rrt.graph_for_plot, rrt.nodes_for_plot);
-//    Visualizer::makeFigure(problem22, rrt.plan(problem22), *rrt.graph_for_plot, rrt.nodes_for_plot);
-//
-//    Visualizer::saveFigures();
+    /* Problem 2 */
+    MyRRT rrt;
+
+    // RRT on HW5, 2a
+    Visualizer::makeFigure(problem52a, rrt.plan(problem52a), *rrt.graph_for_plot, rrt.nodes_for_plot);
+
+    // RRT on HW2, 2
+    Visualizer::makeFigure(problem21, rrt.plan(problem21), *rrt.graph_for_plot, rrt.nodes_for_plot);
+    Visualizer::makeFigure(problem22, rrt.plan(problem22), *rrt.graph_for_plot, rrt.nodes_for_plot);
+
+    Visualizer::saveFigures();
 
      // // Define the (n, r) test pairs
 //     std::vector<std::pair<int, double>> param_pairs = {
@@ -138,91 +138,91 @@ int main(int argc, char** argv) {
 //         "Valid Solutions"
 //     );
 
-      // Problem vector
-     std::vector<Problem2D> problem_vec = {HW5::getWorkspace1(), HW2::getWorkspace1(), HW2::getWorkspace2()};
-     std::list<std::vector<double>> time_all_runtimes;
-     std::list<std::vector<double>> valid_all_runtimes;
-     std::list<std::vector<double>> path_all_runtimes;
-     std::vector<std::string> labels = {"HW2W1", "HW2W2", "HW5W1"};
-
-     // Loop over all (n, r) parameter combinations
-     for (const auto& prob: problem_vec) {
-         std::vector<double> time_runtimes;
-         time_runtimes.reserve(100);
-
-         std::vector<double> valid_runtimes;
-         valid_runtimes.reserve(100);
-
-         std::vector<double> path_runtimes;
-         path_runtimes.reserve(100);
-
-         for (size_t i = 0; i < 100; ++i) {
-             MyRRT rrt;
-
-             // Timing
-             auto start = std::chrono::high_resolution_clock::now();
-             Path2D path = rrt.plan(prob);
-             auto end = std::chrono::high_resolution_clock::now();
-             double elapsed_ms = duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0;
-             time_runtimes.push_back(elapsed_ms);
-
-             // Valid
-             try
-             {
-                 valid_runtimes.push_back(static_cast<double>(rrt.did_it_work));
-             }
-             catch(...)
-             {
-                 valid_runtimes.push_back(0.0);
-             }
-
-
-             // Path length
-             try
-             {
-                 path_runtimes.push_back(path.length());
-             }
-             catch(const std::exception& e)
-             {
-                 path_runtimes.push_back(0.0);
-             }
-
-
-         }
-
-
-         // Push the runtimes
-         time_all_runtimes.push_back(time_runtimes);
-         valid_all_runtimes.push_back(valid_runtimes);
-         path_all_runtimes.push_back(path_runtimes);
-
-     }
-
-
-     // Plot the box plots
-     amp::Visualizer::makeBoxPlot(
-         time_all_runtimes,
-         labels,
-         "RRT Benchmark Runtimes",
-         "Problems",
-         "Computation Time [ms]"
-     );
-
-     amp::Visualizer::makeBoxPlot(
-         path_all_runtimes,
-         labels,
-         "RRT Benchmark Runtimes",
-         "Problems",
-         "Path Length"
-     );
-
-     amp::Visualizer::makeBoxPlot(
-         valid_all_runtimes,
-         labels,
-         "RRT Benchmark Runtimes",
-         "Problems",
-         "Valid Solutions"
-     );
+//      // Problem vector
+//     std::vector<Problem2D> problem_vec = {HW5::getWorkspace1(), HW2::getWorkspace1(), HW2::getWorkspace2()};
+//     std::list<std::vector<double>> time_all_runtimes;
+//     std::list<std::vector<double>> valid_all_runtimes;
+//     std::list<std::vector<double>> path_all_runtimes;
+//     std::vector<std::string> labels = {"HW2W1", "HW2W2", "HW5W1"};
+//
+//     // Loop over all (n, r) parameter combinations
+//     for (const auto& prob: problem_vec) {
+//         std::vector<double> time_runtimes;
+//         time_runtimes.reserve(100);
+//
+//         std::vector<double> valid_runtimes;
+//         valid_runtimes.reserve(100);
+//
+//         std::vector<double> path_runtimes;
+//         path_runtimes.reserve(100);
+//
+//         for (size_t i = 0; i < 100; ++i) {
+//             MyRRT rrt;
+//
+//             // Timing
+//             auto start = std::chrono::high_resolution_clock::now();
+//             Path2D path = rrt.plan(prob);
+//             auto end = std::chrono::high_resolution_clock::now();
+//             double elapsed_ms = duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0;
+//             time_runtimes.push_back(elapsed_ms);
+//
+//             // Valid
+//             try
+//             {
+//                 valid_runtimes.push_back(static_cast<double>(rrt.did_it_work));
+//             }
+//             catch(...)
+//             {
+//                 valid_runtimes.push_back(0.0);
+//             }
+//
+//
+//             // Path length
+//             try
+//             {
+//                 path_runtimes.push_back(path.length());
+//             }
+//             catch(const std::exception& e)
+//             {
+//                 path_runtimes.push_back(0.0);
+//             }
+//
+//
+//         }
+//
+//
+//         // Push the runtimes
+//         time_all_runtimes.push_back(time_runtimes);
+//         valid_all_runtimes.push_back(valid_runtimes);
+//         path_all_runtimes.push_back(path_runtimes);
+//
+//     }
+//
+//
+//     // Plot the box plots
+//     amp::Visualizer::makeBoxPlot(
+//         time_all_runtimes,
+//         labels,
+//         "RRT Benchmark Runtimes",
+//         "Problems",
+//         "Computation Time [ms]"
+//     );
+//
+//     amp::Visualizer::makeBoxPlot(
+//         path_all_runtimes,
+//         labels,
+//         "RRT Benchmark Runtimes",
+//         "Problems",
+//         "Path Length"
+//     );
+//
+//     amp::Visualizer::makeBoxPlot(
+//         valid_all_runtimes,
+//         labels,
+//         "RRT Benchmark Runtimes",
+//         "Problems",
+//         "Valid Solutions"
+//     );
 
     Visualizer::saveFigures();
 

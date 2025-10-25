@@ -252,4 +252,48 @@ namespace amp {
 
         return false;
     }
+
+    // -------------- Determine if multi-agent meta-agent is in collision with obstacles or itself -----------------
+    bool isMultiAgentInCollision(const Eigen::VectorXd& q, const amp::MultiAgentProblem2D& problem) {
+        std::size_t m = problem.numAgents();
+
+        // 1. Obstacle collision
+        for (std::size_t i = 0; i < m; ++i) {
+            const Eigen::Vector2d qi = q.segment<2>(2*i);
+            size_t hit;
+            if (isInCollision(qi, problem.obstacles, problem.agent_properties[i].radius, hit)) {
+                return true; // robot i hits obstacle
+            }
+        }
+
+        // 2. Robot–robot collision
+        for (std::size_t i = 0; i < m; ++i) {
+            for (std::size_t j = i + 1; j < m; ++j) {
+                double dist = (q.segment<2>(2*i) - q.segment<2>(2*j)).norm();
+                double min_dist = problem.agent_properties[i].radius + problem.agent_properties[j].radius;
+                if (dist < min_dist) {
+                    return true; // robots collide
+                }
+            }
+        }
+
+        return false; // safe
+    }
+
+    // -------------- Determine if an edge/segment intersects with an obstacle -----------------
+    bool multiAgentEdgeCollides(const Eigen::VectorXd& start, const Eigen::VectorXd& end,
+                      const amp::MultiAgentProblem2D& problem, double stepSize) {
+
+        // Dummy obstacle index for isInCollision function
+        size_t hitObstacleIdx;
+
+        // Check for all points stepSize apart along the segment for collision
+        for (double t = 0; t <= 1.0; t += stepSize) {
+            Eigen::VectorXd p = ((1.0 - t) * start) + (t * end);
+            if (amp::isMultiAgentInCollision(p, problem)) return true;
+        }
+
+        return false;
+    }
+
 }

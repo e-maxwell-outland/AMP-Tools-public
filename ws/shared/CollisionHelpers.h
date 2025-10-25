@@ -42,4 +42,12 @@ namespace amp {
                         const std::vector<amp::Obstacle2D>& obstacles,
                         double stepSize,
                         double epsilon = 0.0);
+
+    bool multiAgentEdgeCollides(const Eigen::VectorXd& start,
+                        const Eigen::VectorXd& end,
+                        const amp::MultiAgentProblem2D& problem,
+                        double stepSize);
+
+    bool isMultiAgentInCollision(const Eigen::VectorXd& q,
+                                   const amp::MultiAgentProblem2D& problem);
 }
