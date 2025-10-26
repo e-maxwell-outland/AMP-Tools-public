@@ -470,7 +470,7 @@ amp::Path2D MyRRTWithAgentPaths::plan(const amp::Problem2D& problem) {
 
     double step_size = 0.5;
     double goal_bias = 0.05;
-    int max_iters = 5000;
+    int max_iters = 50000;
     double epsilon = 0.25;
 
     std::mt19937 gen(std::random_device{}());

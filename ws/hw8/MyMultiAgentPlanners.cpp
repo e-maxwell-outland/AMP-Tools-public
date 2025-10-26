@@ -1,11 +1,11 @@
-#include "MyMultiAgentPlanners.h"
+# include "MyMultiAgentPlanners.h"
 # include "CollisionHelpers.h"
 # include "MySamplingBasedPlanners.h"
 # include "MyAStar.h"
 # include <random>
 # include <vector>
-#include <queue>
-#include <tuple>
+# include <queue>
+# include <tuple>
 
 // Struct for the A* heuristic
 struct EuclideanHeuristic : public amp::SearchHeuristic {
@@ -20,20 +20,17 @@ struct EuclideanHeuristic : public amp::SearchHeuristic {
     }
 };
 
-struct TimeIndexedNode {
-    Eigen::Vector2d q;   // agent position at this node
-    amp::Node parent_id; // ID of parent node in the tree
-    int time_step;       // time index from the start
-};
-
+// Centralized Coupled Planner
 amp::MultiAgentPath2D MyCentralPlanner::plan(const amp::MultiAgentProblem2D& problem) {
-    // -------- Graph & node storage --------
+    // -------- Reset private variables --------
     graph_for_plot = std::make_shared<amp::Graph<double>>();
     nodes_for_plot.clear();
+    did_it_work = false;
 
     // ---------- Multi-agent joint configuration setup ----------
     std::size_t m = problem.numAgents();              // number of agents
     int dim = static_cast<int>(2 * m);                // 2 DOF per agent (x,y)
+    amp::MultiAgentPath2D path(m); // m = number of agents
 
     // Build joint start and goal vectors (size 2*m)
     Eigen::VectorXd q_start = Eigen::VectorXd::Zero(dim);
@@ -55,7 +52,7 @@ amp::MultiAgentPath2D MyCentralPlanner::plan(const amp::MultiAgentProblem2D& pro
     // -------- RRT parameters --------
     double step_size = 0.5;
     double goal_bias = 0.05;
-    int max_iters = 75000;
+    int max_iters = 30000;
     double epsilon = 0.25;     // distance to consider goal reached
 
     std::mt19937 gen(std::random_device{}());
@@ -145,15 +142,14 @@ amp::MultiAgentPath2D MyCentralPlanner::plan(const amp::MultiAgentProblem2D& pro
             auto result = astar.search(spp, heuristic);
 
             // --- Convert to Path ---
-            amp::MultiAgentPath2D path(m); // m = number of agents
             for (amp::Node n : result.node_path) {
                 const Eigen::VectorXd& q_joint = nodes_for_plot[n];
                 for (int i = 0; i < m; ++i) {
                     path.agent_paths[i].waypoints.push_back(q_joint.segment<2>(2*i));
                 }
             }
-            path.valid = true;
 
+            path.valid = true;
             did_it_work = result.success;
 
             if (!result.success) {
@@ -171,17 +167,24 @@ amp::MultiAgentPath2D MyCentralPlanner::plan(const amp::MultiAgentProblem2D& pro
     }
 
     // Failed to reach goal
-    return {};
+    return path;
 }
 
+// De-coupled Planner
 amp::MultiAgentPath2D MyDecentralPlanner::plan(const amp::MultiAgentProblem2D& problem) {
     std::size_t m = problem.numAgents();
-    std::cout << "[DEBUG] Planning paths for " << m << " agents\n";
+
+    double largest_radius = problem.agent_properties[0].radius;
+		for (std::size_t l = 0; l < m; ++l) {
+            double r = problem.agent_properties[l].radius;
+    		if (r > largest_radius) {
+        		largest_radius = r;
+    		}
+		}
 
     amp::MultiAgentPath2D all_paths(m);
 
     for (std::size_t i = 0; i < m; ++i) {
-        std::cout << "[DEBUG] Agent " << i << " starting planning\n";
 
         // Build a Problem2D for this agent
         amp::Problem2D single_agent_problem;
@@ -196,25 +199,18 @@ amp::MultiAgentPath2D MyDecentralPlanner::plan(const amp::MultiAgentProblem2D& p
         // --- Collect already planned paths for collision checking ---
         std::vector<amp::Path2D> other_paths;
         for (std::size_t j = 0; j < i; ++j) {
-            std::cout << "[DEBUG] Collecting path for previous agent " << j
-                      << ", waypoints: " << all_paths.agent_paths[j].waypoints.size() << "\n";
             other_paths.push_back(all_paths.agent_paths[j]);
         }
 
         // --- Create a new RRT instance that considers other agent paths ---
-        std::cout << "[DEBUG] Creating MyRRTWithAgentPaths instance for agent " << i << "\n";
-        MyRRTWithAgentPaths rrt_with_agents(other_paths, problem.agent_properties[i].radius);
+        MyRRTWithAgentPaths rrt_with_agents(other_paths, largest_radius);
 
         // Plan path
-        std::cout << "[DEBUG] Planning path for agent " << i << "\n";
         amp::Path2D path_i = rrt_with_agents.plan(single_agent_problem);
-        std::cout << "[DEBUG] Agent " << i << " finished planning, waypoints: " << path_i.waypoints.size() << "\n";
 
         // Store in the MultiAgentPath2D structure
         all_paths.agent_paths[i] = path_i;
-        std::cout << "[DEBUG] Stored path for agent " << i << "\n";
     }
 
-    std::cout << "[DEBUG] Finished planning all agents\n";
     return all_paths;
 }
