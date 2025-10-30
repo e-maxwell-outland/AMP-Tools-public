@@ -5,6 +5,9 @@ void MySingleIntegrator::propagate(Eigen::VectorXd& state, Eigen::VectorXd& cont
 };
 
 amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::DynamicAgent& agent) {
+    // TODO: Need to assign agent.dim here in plan method for grader to work
+
+    // Starter code
     amp::KinoPath path;
     Eigen::VectorXd state = problem.q_init;
     path.waypoints.push_back(state);
