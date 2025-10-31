@@ -8,7 +8,13 @@
 
 class MyKinoRRT : public amp::KinodynamicRRT {
     public:
+        MyKinoRRT(int num_u = 15, int iters = 80000);
+
         virtual amp::KinoPath plan(const amp::KinodynamicProblem2D& problem, amp::DynamicAgent& agent) override;
+
+    private:
+        int u_samples;
+        int num_iters;
 };  
 
 class MySingleIntegrator : public amp::DynamicAgent {

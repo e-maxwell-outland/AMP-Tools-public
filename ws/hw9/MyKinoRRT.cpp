@@ -90,6 +90,10 @@ bool isCollisionFree(const Eigen::VectorXd& x_start,
     return true; // all substeps clear
 }
 
+// Kino RRT Constructor
+MyKinoRRT::MyKinoRRT(int num_u, int iters) : u_samples(num_u), num_iters(iters) {
+}
+
 void MySingleIntegrator::propagate(Eigen::VectorXd& state, Eigen::VectorXd& control, double dt) {
     state += dt * control;
 };
@@ -146,11 +150,11 @@ void MySimpleCar::propagate(Eigen::VectorXd& state, Eigen::VectorXd& control, do
         double max_delta = M_PI/1.95; // Just short of 90 degrees max steering to prevent tan() from going crazy
         double delta = std::clamp(x[4], -max_delta, max_delta);
 
-        xdot[0] = x[3] * cos(x[2]);   // dx/dt
-        xdot[1] = x[3] * sin(x[2]);   // dy/dt
-        xdot[2] = (x[3]/L) * tan(delta); // dtheta/dt with clamped steering
-        xdot[3] = u[0];                // dv/dt = acceleration
-        xdot[4] = u[1];                // ddelta/dt = steering rate
+        xdot[0] = x[3] * cos(x[2]);
+        xdot[1] = x[3] * sin(x[2]);
+        xdot[2] = (x[3]/L) * tan(delta);
+        xdot[3] = u[0];
+        xdot[4] = u[1];
 
         return xdot;
     };
@@ -177,8 +181,8 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
     nodes[start_id] = problem.q_init;
 
     // ----- RRT parameters -----
-    double goal_bias = 0.08;
-    int max_iters = 80000;
+    double goal_bias = 0.05;
+    int max_iters = num_iters;
 
     std::mt19937 gen(std::random_device{}());
     std::uniform_real_distribution<double> bias_dist(0.0, 1.0);
@@ -324,7 +328,7 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
         if (nearest_id < 0) continue;
         Eigen::VectorXd x_near = nodes[nearest_id];
 
-        int m = 10; // number of candidate controls to try per expansion (tunable)
+        int m = u_samples; // number of candidate controls to try per expansion (tunable)
 
         double best_score = std::numeric_limits<double>::infinity();
         Eigen::VectorXd best_x;
@@ -400,5 +404,6 @@ amp::KinoPath MyKinoRRT::plan(const amp::KinodynamicProblem2D& problem, amp::Dyn
 
     // Failed
     std::cout << "Path finding failed!\n";
+    path.valid = false;
     return path;
 }
