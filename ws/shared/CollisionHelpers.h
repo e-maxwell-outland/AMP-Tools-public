@@ -12,6 +12,9 @@ namespace amp {
     bool isPointInsidePolygon(const Eigen::Vector2d& point,
                               const Obstacle2D& polygon);
 
+    // Check if two polygons intersect
+    bool doPolygonsIntersect(const Obstacle2D& A, const Obstacle2D& B);
+
     // Check if a point collides with any obstacle in a workspace
     bool isInCollision(const Eigen::Vector2d& point,
                        const std::vector<Obstacle2D>& obstacles,
